@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import EmojiPicker from 'emoji-picker-react';
 import './ChatWindow.css';
+
+import Api from '../Api';
 
 import MessageItem from './MessageItem';
 
@@ -12,7 +14,9 @@ import CloseIcon from '@material-ui/icons/Close';
 import SendIcon from '@material-ui/icons/Send';
 import MicIcon from '@material-ui/icons/Mic';
 
-export default () => {
+export default ({user, data}) => {
+
+    const body = useRef();
 
     let recognition = null;
     let SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -24,6 +28,19 @@ export default () => {
     const [text, setText] = useState('');
     const [listening, setListening] = useState(false);
     const [list, setList] = useState([]);
+    const [users, setUsers] = useState([]);
+
+    useEffect(()=>{
+        setList([]);
+        let unsub = Api.onChatContent(data.chatId, setList, setUsers);
+        return unsub;
+    }, [data.chatId]);
+
+    useEffect(()=>{
+        if(body.current.scrollHeight > body.current.offsetHeight) {
+            body.current.scrollTop = body.current.scrollHeight - body.current.offsetHeight;
+        }
+    }, [list]);
 
     const handleEmojiClick = (e, emojiObject) => {
         setText( text + emojiObject.emoji );
@@ -53,9 +70,19 @@ export default () => {
             recognition.start();
         }
     }
+
+    const handleInputKeyUp = (e) => {
+        if(e.keyCode === 13) {
+            handleSendClick();
+        }
+    }
     
     const handleSendClick = () => {
-
+        if(text !== '') {
+            Api.sendMessage(data, user.id, 'text', text, users);
+            setText('');
+            setEmojiOpen(false);
+        }
     }
 
     return (
@@ -63,8 +90,8 @@ export default () => {
             <div className="chatWindow--header">
 
                 <div className="chatWindow--headerinfo">
-                    <img className="chatWindow--avatar" src="https://www.w3schools.com/howto/img_avatar2.png" alt="" />
-                    <div className="chatWindow--name">Eduardo Correa</div>
+                    <img className="chatWindow--avatar" src={data.image} alt="" />
+                    <div className="chatWindow--name">{data.title}</div>
                 </div>
 
                 <div className="chatWindow--headerbuttons">
@@ -82,11 +109,12 @@ export default () => {
                 </div>
 
             </div>
-            <div className="chatWindow--body">
+            <div ref={body} className="chatWindow--body">
                 {list.map((item, key)=>(
                     <MessageItem 
                         key={key}
-                        date={item}
+                        data={item}
+                        user={user}
                     />
                 ))}
             </div>
@@ -127,6 +155,7 @@ export default () => {
                         placeholder="Digite uma mensagem"
                         value={text}
                         onChange={e=>setText(e.target.value)}
+                        onKeyUp={handleInputKeyUp}
                     />
                 </div>      
                 <div className="chatWindow--pos">
